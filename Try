@@ -1,0 +1,133 @@
+<?php
+function dbConnect() {
+    $host = "localhost";
+    $user = "root";
+    $pass = "";
+    $db   = "test_db";
+
+    $conn = mysqli_connect($host, $user, $pass, $db);
+    if (!$conn) {
+        die("Connection failed: " . mysqli_connect_error());
+    }
+    return $conn;
+}
+?>
+
+
+<?php
+require "connect.php";
+
+// FUNCTIONS
+function getStudents() {
+    $conn = dbConnect();
+    return mysqli_query($conn, "SELECT * FROM students ORDER BY id DESC");
+}
+
+function createStudent($fullname, $email) {
+    $conn = dbConnect();
+    $sql = "INSERT INTO students (fullname, email) VALUES (?, ?)";
+    $stmt = mysqli_prepare($conn, $sql);
+    mysqli_stmt_bind_param($stmt, "ss", $fullname, $email);
+    return mysqli_stmt_execute($stmt);
+}
+
+function updateStudent($id, $fullname, $email) {
+    $conn = dbConnect();
+    $sql = "UPDATE students SET fullname=?, email=? WHERE id=?";
+    $stmt = mysqli_prepare($conn, $sql);
+    mysqli_stmt_bind_param($stmt, "ssi", $fullname, $email, $id);
+    return mysqli_stmt_execute($stmt);
+}
+
+function deleteStudent($id) {
+    $conn = dbConnect();
+    $sql = "DELETE FROM students WHERE id=?";
+    $stmt = mysqli_prepare($conn, $sql);
+    mysqli_stmt_bind_param($stmt, "i", $id);
+    return mysqli_stmt_execute($stmt);
+}
+
+// HANDLE FORM SUBMISSIONS
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (isset($_POST['create'])) {
+        createStudent($_POST['fullname'], $_POST['email']);
+    }
+
+    if (isset($_POST['update'])) {
+        updateStudent($_POST['id'], $_POST['fullname'], $_POST['email']);
+    }
+}
+
+if (isset($_GET['delete'])) {
+    deleteStudent($_GET['delete']);
+}
+
+// FETCH DATA
+$result = getStudents();
+
+// EDIT MODE
+$editMode = false;
+$editData = null;
+if (isset($_GET['edit'])) {
+    $editMode = true;
+    $id = intval($_GET['edit']);
+    $editResult = mysqli_query(dbConnect(), "SELECT * FROM students WHERE id=$id");
+    $editData = mysqli_fetch_assoc($editResult);
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple PHP CRUD</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f4f9; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+        th { background-color: #eee; }
+        form { margin-bottom: 20px; }
+        input[type="text"], input[type="email"] { padding: 8px; width: 250px; margin-right: 10px; }
+        input[type="submit"] { padding: 8px 15px; }
+        a { text-decoration: none; color: #007BFF; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <h2>Simple PHP CRUD Application</h2>
+
+    <!-- CREATE / UPDATE FORM -->
+    <form method="post" action="">
+        <input type="hidden" name="id" value="<?php echo $editMode ? $editData['id'] : ''; ?>">
+        <input type="text" name="fullname" placeholder="Full Name" value="<?php echo $editMode ? $editData['fullname'] : ''; ?>" required>
+        <input type="email" name="email" placeholder="Email" value="<?php echo $editMode ? $editData['email'] : ''; ?>" required>
+        <input type="submit" name="<?php echo $editMode ? 'update' : 'create'; ?>" value="<?php echo $editMode ? 'Update' : 'Add'; ?>">
+        <?php if($editMode): ?>
+            <a href="index.php">Cancel</a>
+        <?php endif; ?>
+    </form>
+
+    <!-- STUDENTS TABLE -->
+    <table>
+        <tr>
+            <th>ID</th>
+            <th>Full Name</th>
+            <th>Email</th>
+            <th>Created At</th>
+            <th>Actions</th>
+        </tr>
+        <?php while($row = mysqli_fetch_assoc($result)) { ?>
+            <tr>
+                <td><?php echo $row['id']; ?></td>
+                <td><?php echo $row['fullname']; ?></td>
+                <td><?php echo $row['email']; ?></td>
+                <td><?php echo $row['created_at']; ?></td>
+                <td>
+                    <a href="?edit=<?php echo $row['id']; ?>">Edit</a> |
+                    <a href="?delete=<?php echo $row['id']; ?>" onclick="return confirm('Are you sure?');">Delete</a>
+                </td>
+            </tr>
+        <?php } ?>
+    </table>
+</body>
+</html>
